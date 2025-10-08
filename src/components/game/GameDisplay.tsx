@@ -14,35 +14,61 @@ const vehicleChars = ['🚙', '🚌', '🚚', '🚗', '🚕', '🚓'];
 
 const RoadAnimation = () => (
   <style jsx>{`
+    @keyframes drive-down {
+      from { transform: translateY(-10vh); }
+      to { transform: translateY(110vh); }
+    }
     .vehicle {
       position: absolute;
       will-change: transform;
-    }
-    @keyframes drive-down {
-      from { transform: translateY(-10vh) translateX(-50%); }
-      to { transform: translateY(110vh) translateX(-50%); }
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
     }
   `}</style>
 );
 
 const generateRandomVehicles = (cols: number) => {
-  return Array.from({ length: cols * 2 }).map((_, i) => {
+  const vehicles = [];
+  
+  // Generate at least one vehicle per lane
+  for (let lane = 0; lane < cols; lane++) {
     const duration = Math.random() * 4 + 3; // 3s to 7s
     const delay = Math.random() * 5; // 0s to 5s
+    const laneWidth = 100 / cols;
+    const left = lane * laneWidth + (laneWidth / 2);
+    const vehicleChar = vehicleChars[Math.floor(Math.random() * vehicleChars.length)];
+    
+    vehicles.push({
+      key: `vehicle-${lane}-${Math.random()}`,
+      char: vehicleChar,
+      style: {
+        left: `${left}%`,
+        animation: `drive-down ${duration}s ${delay}s infinite`,
+      },
+    });
+  }
+  
+  // Add some extra random vehicles for variety
+  const extraVehicles = Math.floor(cols * 0.5); // 50% more vehicles than lanes
+  for (let i = 0; i < extraVehicles; i++) {
+    const duration = Math.random() * 4 + 3;
+    const delay = Math.random() * 5;
     const laneWidth = 100 / cols;
     const lane = Math.floor(Math.random() * cols);
     const left = lane * laneWidth + (laneWidth / 2);
     const vehicleChar = vehicleChars[Math.floor(Math.random() * vehicleChars.length)];
-    return {
-      key: `vehicle-${i}-${Math.random()}`,
+    
+    vehicles.push({
+      key: `extra-${i}-${Math.random()}`,
       char: vehicleChar,
       style: {
         left: `${left}%`,
-        transform: 'translateX(-50%)',
         animation: `drive-down ${duration}s linear ${delay}s infinite`,
       },
-    };
-  });
+    });
+  }
+  
+  return vehicles;
 };
 
 
@@ -70,21 +96,33 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
       </div>
 
       <RoadAnimation />
-      <div className="absolute inset-x-0 top-0 bottom-0 flex justify-evenly">
-        {Array.from({ length: columns - 1 }).map((_, i) => (
-          <div key={`lane-line-${i}`} className="h-full w-[2px] border-l-2 border-dashed border-foreground/10" />
-        ))}
-      </div>
-
-      {vehicleData.map(data => (
-        <div
-          key={data.key}
-          className="vehicle text-5xl"
-          style={data.style}
-        >
-          {data.char}
+      
+      {/* Lane lines */}
+      <div className="absolute inset-0">
+        <div className="relative w-full h-full">
+          <div className="absolute inset-0 flex justify-evenly">
+            {Array.from({ length: columns - 1 }).map((_, i) => (
+              <div key={`lane-line-${i}`} className="h-full w-[2px] border-l-2 border-dashed border-foreground/10" />
+            ))}
+          </div>
+          
+          {/* Vehicles container */}
+          <div className="relative w-full h-full">
+            {vehicleData.map((data, index) => (
+              <div
+                key={data.key}
+                className="vehicle text-5xl absolute"
+                style={{
+                  ...data.style,
+                  transform: 'translateX(-50%)',
+                }}
+              >
+                {data.char}
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
+      </div>
 
       <div 
         className={cn(
