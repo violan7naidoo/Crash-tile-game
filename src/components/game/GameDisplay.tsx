@@ -9,7 +9,9 @@ interface GameDisplayProps {
   columns: number;
   multiplier: number;
   onBust: () => void;
-  jumpCount: number; // Add jump count prop
+  jumpCount: number;
+  // Add next multiplier to show in the next lane
+  nextMultiplier?: number;
 }
 
 const vehicleChars = ['🚙', '🚌', '🚚', '🚗', '🚕', '🚓'];
@@ -40,7 +42,7 @@ const RoadAnimation = () => (
   `}</style>
 );
 
-export default function GameDisplay({ status, monkeyPosition, columns, multiplier, onBust, jumpCount }: GameDisplayProps) {
+export default function GameDisplay({ status, monkeyPosition, columns, multiplier, onBust, jumpCount, nextMultiplier }: GameDisplayProps) {
   // Calculate monkey position to be centered in the lane
   const monkeyPositionStyle = {
     left: `${((monkeyPosition + 0.5) / columns) * 100}%`,
@@ -240,6 +242,98 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
     };
   }, [status, onBust, jumpCount]);
 
+  // Render all lane multipliers
+  const renderLaneMultipliers = () => {
+    if (status !== 'playing') return null;
+    
+    const laneWidth = 100 / columns;
+    
+    return Array.from({ length: columns }).map((_, index) => {
+      // Skip the first lane (starting position)
+      if (index === 0) return null;
+      
+      const isReached = index <= monkeyPosition;
+      const isNext = index === monkeyPosition + 1;
+      const laneMultiplier = calculateLaneMultiplier(index);
+      
+      if (isReached && !isNext) return null; // Don't show passed lanes except current
+      
+      const left = (index + 0.5) * laneWidth;
+      
+      return (
+        <div 
+          key={`lane-multiplier-${index}`}
+          className="absolute z-20 text-center pointer-events-none"
+          style={{
+            left: `${left}%`,
+            bottom: '0.2rem',
+            transform: 'translateX(-50%)',
+            textShadow: '0 0 10px rgba(255,255,255,0.8)',
+            transition: 'all 0.3s ease-out',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.25rem',
+            opacity: isNext ? 1 : 0.7
+          }}
+        >
+          <div className={`${
+            isNext 
+              ? 'bg-green-500/90 border-white/30' 
+              : 'bg-yellow-500/80 border-yellow-200/30'
+          } text-white font-bold rounded-full w-10 h-10 flex items-center justify-center text-md shadow-lg border-2`}>
+            {laneMultiplier.toFixed(2)}x
+          </div>
+          {isNext && (
+            <div className="bg-black/70 text-green-300 font-bold text-xs px-2 py-1 rounded-full">
+              NEXT
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+  
+  // Helper function to calculate multiplier for a specific lane
+  const calculateLaneMultiplier = (laneIndex: number) => {
+    const difficultyMultiplier = 1; // Adjust based on your game's difficulty settings
+    const baseMultiplier = 1 + (laneIndex * 0.2 * difficultyMultiplier);
+    return parseFloat(baseMultiplier.toFixed(2));
+  };
+  
+  // Keep the original function but rename it to maintain compatibility
+  const renderNextMultiplier = () => {
+    if (status !== 'playing' || !nextMultiplier) return null;
+    
+    const nextLane = Math.min(monkeyPosition + 1, columns - 1);
+    const laneWidth = 100 / columns;
+    const left = (nextLane + 0.5) * laneWidth;
+    
+    return (
+      <div 
+        className="absolute z-20 text-center pointer-events-none"
+        style={{
+          left: `${left}%`,
+          bottom: '0.2rem',
+          transform: 'translateX(-50%)',
+          textShadow: '0 0 10px rgba(255,255,255,0.8)',
+          transition: 'all 0.3s ease-out',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '0.25rem'
+        }}
+      >
+        <div className="bg-green-500/90 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center text-md shadow-lg border-2 border-white/30">
+          {nextMultiplier.toFixed(2)}x
+        </div>
+        <div className="bg-black/70 text-green-300 font-bold text-xs px-2 py-1 rounded-full">
+          NEXT
+        </div>
+      </div>
+    );
+  };
+
   // Render vehicles
   const renderVehicles = () => {
     const laneWidth = 100 / columns;
@@ -319,9 +413,10 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
             })}
           </div>
           
-          {/* Vehicles container */}
+          {/* Game elements container */}
           <div className="relative w-full h-full">
             {renderVehicles()}
+            {renderLaneMultipliers()}
           </div>
         </div>
       </div>

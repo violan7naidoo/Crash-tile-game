@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import ControlPanel from '@/components/game/ControlPanel';
 import GameDisplay from '@/components/game/GameDisplay';
 import { GameState, Difficulty, difficultySettings } from '@/lib/definitions';
@@ -14,17 +14,28 @@ const INITIAL_STATE: Omit<GameState, 'betAmount' | 'difficulty'> = {
   gameId: null,
 };
 
-const GRID_COLUMNS = 12; // Increased from 10 to 12 to accommodate two more lanes
+const GRID_COLUMNS = 12;
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState>({
-      ...INITIAL_STATE,
-      betAmount: 1,
-      difficulty: 'Easy',
+    ...INITIAL_STATE,
+    betAmount: 1,
+    difficulty: 'Easy',
   });
+  
   const [jumpCount, setJumpCount] = useState(0);
   const { balance, addToBalance, subtractFromBalance } = useWallet();
   const { toast } = useToast();
+
+  // Calculate the next potential multiplier
+  const calculateNextMultiplier = (currentPosition: number, currentMultiplier: number): number => {
+    if (currentPosition >= GRID_COLUMNS - 1) return currentMultiplier;
+    
+    const difficultyMultiplier = difficultySettings[gameState.difficulty].multiplier;
+    const baseIncrement = 0.2 * difficultyMultiplier;
+    const positionBasedIncrement = ((currentPosition + 1) / GRID_COLUMNS) * 0.3 * difficultyMultiplier;
+    return parseFloat((currentMultiplier + baseIncrement + positionBasedIncrement).toFixed(2));
+  };
 
   const handlePlay = () => {
     if (balance < gameState.betAmount) {
@@ -37,7 +48,7 @@ export default function GamePage() {
     }
 
     subtractFromBalance(gameState.betAmount);
-    setJumpCount(0); // Reset jump count when starting a new game
+    setJumpCount(0);
     setGameState((prev) => ({
       ...prev,
       status: 'playing',
@@ -64,15 +75,12 @@ export default function GamePage() {
 
     // Calculate new position and multiplier
     const newPosition = gameState.monkeyPosition + 1;
-    const difficultyMultiplier = difficultySettings[gameState.difficulty].multiplier;
-    const baseMultiplierIncrement = 0.2 * difficultyMultiplier; // Base increment scaled by difficulty
-    const positionBasedIncrement = (newPosition / GRID_COLUMNS) * 0.3 * difficultyMultiplier; // Increases as you progress
-    const newMultiplier = parseFloat((gameState.currentMultiplier + baseMultiplierIncrement + positionBasedIncrement).toFixed(2));
+    const newMultiplier = calculateNextMultiplier(newPosition, gameState.currentMultiplier);
 
     if (newPosition >= GRID_COLUMNS) {
-      handleCashOut(); // Auto cash-out at the end
+      handleCashOut();
     } else {
-      setGameState((prev) => ({
+      setGameState(prev => ({
         ...prev,
         monkeyPosition: newPosition,
         currentMultiplier: newMultiplier,
@@ -84,10 +92,12 @@ export default function GamePage() {
     const finalMultiplier = gameState.currentMultiplier;
     const winnings = gameState.betAmount * finalMultiplier;
     addToBalance(winnings);
+    
     toast({
       title: 'Cashed Out!',
       description: `You won R${winnings.toFixed(2)}!`,
     });
+    
     resetGame();
   };
 
@@ -95,19 +105,24 @@ export default function GamePage() {
     setJumpCount(0);
     setGameState(prevState => ({
       ...INITIAL_STATE,
-      // Keep bet amount and difficulty from last round
       betAmount: prevState.betAmount,
       difficulty: prevState.difficulty,
     }));
   };
 
   const setBetAmount = (amount: number) => {
-    setGameState((prev) => ({ ...prev, betAmount: amount }));
+    setGameState(prev => ({ ...prev, betAmount: amount }));
   };
 
   const setDifficulty = (difficulty: Difficulty) => {
-    setGameState((prev) => ({ ...prev, difficulty }));
+    setGameState(prev => ({ ...prev, difficulty }));
   };
+
+  // Calculate next multiplier to display
+  const nextMultiplier = calculateNextMultiplier(
+    gameState.monkeyPosition + 1, 
+    gameState.currentMultiplier
+  );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full min-h-[calc(100vh-8rem)]">
@@ -119,6 +134,7 @@ export default function GamePage() {
           multiplier={gameState.currentMultiplier}
           onBust={handleBust}
           jumpCount={jumpCount}
+          nextMultiplier={nextMultiplier}
         />
       </div>
       <div className="lg:col-span-1 pr-4">
