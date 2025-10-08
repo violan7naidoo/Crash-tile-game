@@ -27,7 +27,7 @@ export default function WalletPage() {
             <CardDescription>Your available funds for playing.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-5xl font-bold font-headline">${balance.toFixed(2)}</p>
+            <p className="text-5xl font-bold font-headline">R{balance.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -76,7 +76,7 @@ export default function WalletPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {tx.amount > 0 ? `+$${tx.amount.toFixed(2)}` : `-$${Math.abs(tx.amount).toFixed(2)}`}
+                    {tx.amount > 0 ? `+R${tx.amount.toFixed(2)}` : `-R${Math.abs(tx.amount).toFixed(2)}`}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{tx.date}</TableCell>
                 </TableRow>

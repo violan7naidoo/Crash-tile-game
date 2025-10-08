@@ -56,7 +56,7 @@ export default function ControlPanel({
         <div className="grid gap-2">
           <Label htmlFor="bet-amount">Bet Amount</Label>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">$</span>
+            <span className="text-muted-foreground">R</span>
             <Input
               id="bet-amount"
               type="number"
@@ -69,7 +69,7 @@ export default function ControlPanel({
             />
           </div>
           <div className="flex justify-between mt-1">
-            <Button variant="outline" size="sm" onClick={() => setBetAmount(betAmount / 2)} disabled={isPlaying}>/2</Button>
+            <Button variant="outline" size="sm" onClick={() => setBetAmount(betAmount / 2)} disabled={isPlaying}>1/2</Button>
             <Button variant="outline" size="sm" onClick={() => setBetAmount(betAmount * 2)} disabled={isPlaying}>x2</Button>
             <Button variant="outline" size="sm" onClick={() => setBetAmount(balance)} disabled={isPlaying}>Max</Button>
           </div>
@@ -88,10 +88,9 @@ export default function ControlPanel({
                 <RadioGroupItem value={level} id={level} className="peer sr-only" />
                 <Label
                   htmlFor={level}
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-accent [&:has([data-state=checked])]:border-accent"
+                  className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-accent [&:has([data-state=checked])]:border-accent"
                 >
                   {level}
-                  <span className="text-xs text-muted-foreground">{difficultySettings[level as Difficulty].lanes} lanes</span>
                 </Label>
               </div>
             ))}
@@ -106,12 +105,16 @@ export default function ControlPanel({
         )}
         {status === 'playing' && (
           <div className="w-full grid grid-cols-2 gap-2">
-            <Button className="bg-yellow-500 hover:bg-yellow-600 text-yellow-foreground text-lg" size="lg" onClick={onCashOut}>
-              <DollarSign className="mr-2 h-5 w-5" />
-              Cash Out (${potentialWinnings})
+            <Button 
+              className="bg-yellow-500 hover:bg-yellow-600 text-yellow-foreground text-xs sm:text-sm whitespace-nowrap px-2 h-9" 
+              size="sm" 
+              onClick={onCashOut}
+            >
+              
+              <span>R{potentialWinnings}</span>
             </Button>
-            <Button className="bg-green-500 hover:bg-green-600 text-white text-lg" size="lg" onClick={onMove}>
-              Move <ArrowRight className="ml-2 h-5 w-5" />
+            <Button className="bg-green-500 hover:bg-green-600 text-white text-sm" size="sm" onClick={onMove}>
+              Move <ArrowRight className="ml-2 h-1 w-1" />
             </Button>
           </div>
         )}

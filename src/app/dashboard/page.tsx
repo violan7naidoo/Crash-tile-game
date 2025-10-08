@@ -14,7 +14,7 @@ const INITIAL_STATE: Omit<GameState, 'betAmount' | 'difficulty'> = {
   gameId: null,
 };
 
-const GRID_COLUMNS = 10;
+const GRID_COLUMNS = 12; // Increased from 10 to 12 to accommodate two more lanes
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState>({
@@ -45,28 +45,19 @@ export default function GamePage() {
     }));
   };
 
+  const handleBust = () => {
+    setGameState(prev => ({ ...prev, status: 'busted' }));
+    toast({
+      title: 'Busted!',
+      description: `You lost your R${gameState.betAmount.toFixed(2)} bet.`,
+      variant: 'destructive',
+    });
+  };
+
   const handleMove = () => {
     if (gameState.status !== 'playing') return;
 
-    // Get difficulty settings
-    const { bustChance } = difficultySettings[gameState.difficulty];
-    
-    // Calculate base bust chance (scales with position to make later moves riskier)
-    const positionFactor = (gameState.monkeyPosition + 1) / GRID_COLUMNS;
-    const bustProbability = 0.05 * bustChance * (1 + positionFactor * 2); // 5% base chance, scaled by difficulty and position
-
-    // Check if the monkey gets busted
-    const isBusted = Math.random() < bustProbability;
-
-    if (isBusted) {
-      setGameState((prev) => ({ ...prev, status: 'busted' }));
-      toast({
-        title: 'Busted!',
-        description: `You lost your $${gameState.betAmount.toFixed(2)} bet.`,
-        variant: 'destructive',
-      });
-      return;
-    }
+    // Collision detection is now handled in GameDisplay
 
     // Calculate new position and multiplier
     const newPosition = gameState.monkeyPosition + 1;
@@ -92,7 +83,7 @@ export default function GamePage() {
     addToBalance(winnings);
     toast({
       title: 'Cashed Out!',
-      description: `You won $${winnings.toFixed(2)}!`,
+      description: `You won R${winnings.toFixed(2)}!`,
     });
     resetGame();
   };
@@ -115,16 +106,17 @@ export default function GamePage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full min-h-[calc(100vh-8rem)]">
-      <div className="lg:col-span-2 rounded-lg bg-card border overflow-hidden relative">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full min-h-[calc(100vh-8rem)]">
+      <div className="lg:col-span-4 rounded-lg bg-card border overflow-hidden relative">
         <GameDisplay
           status={gameState.status}
           monkeyPosition={gameState.monkeyPosition}
           columns={GRID_COLUMNS}
           multiplier={gameState.currentMultiplier}
+          onBust={handleBust}
         />
       </div>
-      <div className="lg:col-span-1">
+      <div className="lg:col-span-1 pr-4">
         <ControlPanel
           betAmount={gameState.betAmount}
           setBetAmount={setBetAmount}

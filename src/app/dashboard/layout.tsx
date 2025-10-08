@@ -35,7 +35,7 @@ function UserProfile() {
       <div className="text-right">
         <p className="font-semibold">CheekyMonkey</p>
         <p className="text-sm text-muted-foreground">
-          ${balance.toFixed(2)}
+          R{balance.toFixed(2)}
         </p>
       </div>
       <Avatar>
@@ -62,7 +62,7 @@ function DashboardLayoutContent({
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader>
+        <SidebarHeader className="px-2">
           <div className="flex items-center justify-between">
             <VervetLogo />
           </div>
@@ -102,12 +102,12 @@ function DashboardLayoutContent({
             </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-        <header className="flex h-16 items-center justify-between border-b px-6">
-            <SidebarTrigger />
+      <SidebarInset className="w-[calc(100%-12rem)]">
+        <header className="flex h-16 items-center justify-between border-b px-4">
+            <SidebarTrigger className="ml-2" />
             <UserProfile />
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-2 md:p-4">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -8,6 +8,8 @@ interface GameDisplayProps {
   monkeyPosition: number;
   columns: number;
   multiplier: number;
+  onBust: () => void;
+  jumpCount: number; // Add jump count prop
 }
 
 const vehicleChars = ['🚙', '🚌', '🚚', '🚗', '🚕', '🚓'];
@@ -15,7 +17,7 @@ const vehicleChars = ['🚙', '🚌', '🚚', '🚗', '🚕', '🚓'];
 const RoadAnimation = () => (
   <style jsx>{`
     @keyframes drive-down {
-      from { transform: translateY(-20vh); }
+      from { transform: translateY(-100%); }
       to { transform: translateY(120vh); }
     }
     @keyframes moveDown {
@@ -34,54 +36,14 @@ const RoadAnimation = () => (
       perspective: 1000px;
     }
     .transform-style-preserve-3d {
-      transform-style: preserve-3d;
     }
   `}</style>
 );
 
-const generateRandomVehicles = (cols: number) => {
-  const vehicles = [];
-  const baseDuration = 3; // Base duration in seconds
-  const speedVariation = 2; // Speed variation in seconds
-  
-  // Track which lanes already have vehicles
-  const usedLanes = new Set();
-  
-  // Generate one vehicle per lane with unique speed
-  for (let i = 0; i < cols; i++) {
-    let lane;
-    // Find an unused lane
-    do {
-      lane = Math.floor(Math.random() * cols);
-    } while (usedLanes.has(lane));
-    
-    usedLanes.add(lane);
-    const laneWidth = 100 / cols;
-    const left = lane * laneWidth + (laneWidth / 2);
-    
-    // Each lane gets one vehicle with a unique speed
-    const duration = baseDuration + (Math.random() * speedVariation);
-    const vehicleChar = vehicleChars[Math.floor(Math.random() * vehicleChars.length)];
-    
-    vehicles.push({
-      key: `vehicle-${lane}-${Date.now()}`,
-      char: vehicleChar,
-      style: {
-        left: `${left}%`,
-        animation: `drive-down ${duration}s 0s 1`, // Remove infinite, run once
-      },
-      lane: lane,
-      duration: duration * 1000, // Convert to ms
-    });
-  }
-  
-  return vehicles;
-};
-
-
-export default function GameDisplay({ status, monkeyPosition, columns, multiplier }: GameDisplayProps) {
+export default function GameDisplay({ status, monkeyPosition, columns, multiplier, onBust, jumpCount }: GameDisplayProps) {
+  // Calculate monkey position to be centered in the lane
   const monkeyPositionStyle = {
-    left: `calc(${(monkeyPosition / columns) * 100}% + ${(1 / columns) * 50}%)`,
+    left: `${((monkeyPosition + 0.5) / columns) * 100}%`,
     transform: 'translateX(-50%)',
     transition: 'left 0.2s linear',
   };
@@ -94,86 +56,216 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
     duration: number;
   }
 
-  const [vehicleData, setVehicleData] = useState<Vehicle[]>([]);
-
-  useEffect(() => {
-    // Function to create a new vehicle in a specific lane
-    const createVehicle = (lane: number): Vehicle => {
-      const laneWidth = 100 / columns;
-      const left = lane * laneWidth + (laneWidth / 2);
-      const duration = 3 + (Math.random() * 2); // 3-5s
-      
-      return {
-        key: `vehicle-${lane}-${Date.now()}`,
-        char: vehicleChars[Math.floor(Math.random() * vehicleChars.length)],
-        style: {
-          left: `${left}%`,
-          animation: `drive-down ${duration}s 0s 1`,
-        },
-        lane: lane,
-        duration: duration * 1000, // Store duration in milliseconds
-      };
-    };
-
-    // Initial set of vehicles
-    const initialVehicles = Array.from({ length: columns }, (_, i) => createVehicle(i));
-    setVehicleData(initialVehicles);
+  // Refs for collision detection and animation
+  const vehicleRefs = React.useRef<{[key: string]: HTMLDivElement | null}>({});
+  const monkeyRef = React.useRef<HTMLDivElement>(null);
+  const animationFrameRef = React.useRef<number>();
+  const lastCheckTime = React.useRef<number>(0);
+  const isMounted = React.useRef(false);
+  
+  // State for vehicle data
+  const [vehicles, setVehicles] = React.useState<Vehicle[]>([]);
+  
+  // Function to create a new vehicle with random speed and position
+  const createVehicle = React.useCallback((lane: number, delay: number = 0): Vehicle => {
+    const laneWidth = 100 / columns;
+    // Position vehicles slightly to the left of lane center (half the jump width)
+    const left = (lane + 0.4) * laneWidth;
+    const duration = 2 + (Math.random() * 3); // 2-5s (faster cars)
+    const key = `vehicle-${lane}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Function to replace a vehicle when its animation ends
-    const replaceVehicle = (lane: number): NodeJS.Timeout => {
-      const newVehicle = createVehicle(lane);
-      
-      setVehicleData(prev => [
-        ...prev.filter(v => v.lane !== lane),
-        newVehicle
-      ]);
-      
-      // Schedule next vehicle for this lane
-      const duration = parseFloat(newVehicle.style.animation?.toString().split(' ')[1] || '3');
-      return setTimeout(() => {
-        replaceVehicle(lane);
-      }, duration * 1000);
+    // Start the vehicle just above the viewport and animate it down
+    return {
+      key,
+      char: vehicleChars[Math.floor(Math.random() * vehicleChars.length)],
+      style: {
+        left: `${left}%`,
+        transform: 'translateY(-100%)', // Start above the viewport
+        animation: `drive-down ${duration}s ${delay}s linear 1 forwards`,
+        willChange: 'transform',
+      },
+      lane,
+      duration: duration * 1000,
     };
+  }, [columns]);
+  
+  // Clean up on unmount
+  React.useEffect(() => {
+    isMounted.current = true;
     
-    // Start the cycle for each lane
+    return () => {
+      isMounted.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      setVehicles([]);
+    };
+  }, []);
+  
+  // Track which lanes currently have active vehicles
+  const activeLanes = React.useRef<Set<number>>(new Set());
+  
+  // Generate vehicles effect with staggered timing
+  React.useEffect(() => {
+    if (status !== 'playing') {
+      setVehicles([]);
+      activeLanes.current.clear();
+      return;
+    }
+    
     const timeouts: NodeJS.Timeout[] = [];
     
-    initialVehicles.forEach((vehicle, i) => {
-      const duration = parseFloat(vehicle.style.animation?.toString().split(' ')[1] || '3');
-      const delay = Math.random() * 2000; // Stagger initial appearance
+    // Function to add a vehicle to a specific lane with a delay
+    const addVehicleToLane = (lane: number, delay: number) => {
+      const timeout = setTimeout(() => {
+        if (status !== 'playing') return;
+        
+        // Only add a vehicle if the lane is currently empty
+        if (!activeLanes.current.has(lane)) {
+          activeLanes.current.add(lane);
+          
+          // Create a new vehicle with no delay to prevent the freeze
+          const newVehicle = createVehicle(lane, 0);
+          
+          setVehicles(prev => [...prev, newVehicle]);
+          
+          // Calculate when this vehicle will be done
+          const vehicleDuration = newVehicle.duration / 1000; // in seconds
+          
+          // Schedule the next vehicle for this lane after this one is done, plus some gap
+          const gapBetweenVehicles = 1 + Math.random() * 2; // 1-3s gap
+          const nextDelay = vehicleDuration + gapBetweenVehicles;
+          
+          // Remove the vehicle after its animation completes
+          const removeTimeout = setTimeout(() => {
+            setVehicles(prev => prev.filter(v => v.key !== newVehicle.key));
+            activeLanes.current.delete(lane);
+            
+            // Schedule next vehicle for this lane
+            addVehicleToLane(lane, 0);
+          }, (vehicleDuration * 1000) * 1.1); // Add 10% buffer
+          
+          timeouts.push(removeTimeout);
+        }
+      }, delay * 1000);
       
-      const timeoutId = setTimeout(() => {
-        const newTimeoutId = replaceVehicle(i);
-        timeouts.push(newTimeoutId);
-      }, delay);
-      
-      timeouts.push(timeoutId);
-    });
+      timeouts.push(timeout);
+    };
+    
+    // Start vehicle generation for each lane with staggered initial delays
+    for (let i = 0; i < columns; i++) {
+      // Stagger the initial appearance of vehicles in each lane
+      const initialDelay = Math.random() * 3;
+      addVehicleToLane(i, initialDelay);
+    }
     
     // Cleanup function
     return () => {
       timeouts.forEach(clearTimeout);
+      setVehicles([]);
+      activeLanes.current.clear();
     };
-  }, [columns]);
+  }, [status, columns, createVehicle]);
+
+  // Collision detection effect
+  React.useEffect(() => {
+    if (status !== 'playing') return;
+    
+    const checkCollisions = () => {
+      const monkey = monkeyRef.current;
+      if (!monkey) return;
+      
+      const monkeyRect = monkey.getBoundingClientRect();
+      
+      // Check collision with each vehicle
+      Object.entries(vehicleRefs.current).forEach(([key, vehicle]) => {
+        if (!vehicle) return;
+        
+        const vehicleRect = vehicle.getBoundingClientRect();
+        
+        // More precise collision detection
+        const laneWidth = window.innerWidth / columns;
+        const monkeyLane = Math.floor(monkeyPosition);
+        const vehicleLane = Math.floor(parseFloat(vehicle.style.left) / 100 * columns);
+        
+        // Check if the vehicle is in the same lane as the monkey
+        if (monkeyLane === vehicleLane) {
+          // Check vertical overlap (monkey's bottom is below vehicle's top)
+          if (monkeyRect.bottom > vehicleRect.top && monkeyRect.top < vehicleRect.bottom) {
+            // Only trigger collision if the vehicle is close to the monkey's vertical position
+            const verticalOverlap = Math.min(monkeyRect.bottom, vehicleRect.bottom) - Math.max(monkeyRect.top, vehicleRect.top);
+            
+            // Check if the vehicle is coming from above
+            const isVehicleAbove = vehicleRect.bottom < (monkeyRect.top + (monkeyRect.height * 0.7));
+            
+            // Monkey is protected from above for first 5 jumps
+            const isProtected = jumpCount < 5 && isVehicleAbove;
+            
+            // Only trigger bust if not protected and there's significant overlap
+            if (!isProtected && verticalOverlap > monkeyRect.height * 0.4) {
+              onBust();
+            }
+          }
+        }
+      });
+      
+      animationFrameRef.current = requestAnimationFrame(checkCollisions);
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(checkCollisions);
+    
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [status, onBust, jumpCount]);
+
+  // Render vehicles
+  const renderVehicles = () => {
+    const laneWidth = 100 / columns;
+    
+    return vehicles.map((data) => {
+      // Calculate position slightly to the left of lane center (half the jump width)
+      const laneCenter = (data.lane + 0.2) * laneWidth;
+      
+      return (
+        <div
+          key={data.key}
+          ref={el => {
+            if (el) {
+              vehicleRefs.current[data.key] = el;
+            } else {
+              delete vehicleRefs.current[data.key];
+            }
+          }}
+          className="vehicle text-5xl absolute z-20"
+          style={{
+            ...data.style,
+            left: `${laneCenter}%`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {data.char}
+        </div>
+      );
+    });
+  };
   
   return (
-    <div className="w-full h-full bg-gradient-to-b from-gray-900 to-gray-800 flex flex-col items-center justify-center overflow-hidden relative">
-      {/* road surface with subtle texture */}
-      <div 
-        className="absolute inset-0"
-        style={{
-          backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'0.1\' fill-rule=\'evenodd\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/svg%3E")',
-          backgroundSize: '60px 60px',
+    <div className="w-full h-full bg-gradient-to-b from-gray-800 to-gray-900 flex flex-col items-center justify-center overflow-hidden relative">
+      {/* Road surface with subtle texture - more optimized */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-900 to-gray-800">
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c0 2.76-2.24 5-5 5s-5-2.24-5-5 2.24-5 5-5 5 2.24 5 5zm-1-15c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z\' fill=\'%23ffffff\' fill-opacity=\'0.05\' fill-rule=\'evenodd\'/%3E%3C/svg%3E")',
+          backgroundSize: '200px 200px',
           backgroundRepeat: 'repeat'
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
+        }} />
       </div>
 
-      {/* Multiplier Display */}
-      <div className="absolute top-4 left-4 bg-black/70 text-white p-4 rounded-lg z-10 font-headline border border-white/10 shadow-lg">
-        <div className="text-2xl font-bold">{multiplier.toFixed(2)}x</div>
-        <div className="text-xs text-muted-foreground">Multiplier</div>
+      {/* Multiplier Display - More compact and modern */}
+      <div className="absolute top-3 left-3 bg-black/80 text-white px-3 py-2 rounded-lg z-10 font-headline border border-white/10 shadow-lg backdrop-blur-sm">
+        <div className="text-xl font-bold tracking-tight">{multiplier.toFixed(2)}x</div>
       </div>
 
       <RoadAnimation />
@@ -181,49 +273,60 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
       {/* Road with perspective */}
       <div className="absolute inset-0 perspective-1000">
         <div className="relative w-full h-full transform-style-preserve-3d">
-          {/* Lane lines */}
-          <div className="absolute inset-0 flex justify-evenly">
-            {Array.from({ length: columns - 1 }).map((_, i) => (
-              <div 
-                key={`lane-line-${i}`} 
-                className="h-full w-[1px] bg-white/30 relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 right-0 h-12 bg-white/80 animate-[moveDown_1.5s_linear_infinite]" 
-                     style={{ animationDelay: `${i * 0.2}s` }} />
-              </div>
-            ))}
+          {/* Lane lines - Create proper road sections with spacing */}
+          <div className="absolute inset-0">
+            {Array.from({ length: columns + 1 }).map((_, i) => {
+              // Evenly distribute lines across the full width
+              const linePosition = (i / columns) * 100;
+              return (
+                <div 
+                  key={`lane-line-${i}`}
+                  className="h-full w-[1px] bg-white/40 absolute top-0 bottom-0"
+                  style={{ 
+                    left: `${linePosition}%`,
+                    boxShadow: '0 0 8px 1px rgba(255,255,255,0.3)'
+                  }}
+                >
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-transparent via-white to-transparent animate-[moveDown_1.5s_linear_infinite]"
+                    style={{ 
+                      animationDelay: `${i * 0.2}s`,
+                      height: '60px',
+                      width: '100%',
+                    }} 
+                  />
+                </div>
+              );
+            })}
           </div>
           
           {/* Vehicles container */}
           <div className="relative w-full h-full">
-            {vehicleData.map((data) => (
-              <div
-                key={data.key}
-                className="vehicle text-5xl absolute"
-                style={{
-                  ...data.style,
-                  transform: 'translateX(-50%)',
-                }}
-                onAnimationEnd={() => {
-                  // Remove the vehicle when its animation ends
-                  // The replacement is handled by the effect
-                }}
-              >
-                {data.char}
-              </div>
-            ))}
+            {renderVehicles()}
           </div>
         </div>
       </div>
 
       <div 
+        ref={monkeyRef}
         className={cn(
-          "absolute bottom-4 text-5xl transition-transform duration-300",
-           status === 'busted' && 'animate-ping'
+          "absolute bottom-4 transition-all duration-200 z-30",
+          status === 'busted' ? 'animate-ping scale-150' : 'hover:scale-110'
         )} 
         style={monkeyPositionStyle}
       >
-        {status === 'busted' ? '💥' : '🐒'}
+        {/* Protection barrier (only visible and active for first 5 jumps) */}
+        {status !== 'busted' && jumpCount < 5 && (
+          <div 
+            className="absolute -top-8 left-1/2 -translate-x-1/2 w-16 h-4 bg-yellow-400/50 rounded-full z-40"
+            style={{ 
+              boxShadow: '0 0 15px 5px rgba(255, 255, 0, 0.3)'
+            }}
+          />
+        )}
+        <div className="text-6xl drop-shadow-lg relative z-30">
+          {status === 'busted' ? '💥' : '🐒'}
+        </div>
       </div>
 
       {status === 'busted' && (
