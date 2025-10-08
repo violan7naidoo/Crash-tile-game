@@ -24,10 +24,10 @@ export type Transaction = {
 export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Hardcore';
 
 export const difficultySettings = {
-  Easy: { lanes: 30, multiplier: 1.1 },
-  Medium: { lanes: 25, multiplier: 1.25 },
-  Hard: { lanes: 22, multiplier: 1.5 },
-  Hardcore: { lanes: 18, multiplier: 2.0 },
+  Easy: { lanes: 30, multiplier: 1.1, bustChance: 0.7 },
+  Medium: { lanes: 25, multiplier: 1.5, bustChance: 1.0 },
+  Hard: { lanes: 20, multiplier: 2.0, bustChance: 1.5 },
+  Hardcore: { lanes: 15, multiplier: 3.0, bustChance: 2.0 },
 };
 
 export type GameRound = {

@@ -172,7 +172,8 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
 
       {/* Multiplier Display */}
       <div className="absolute top-4 left-4 bg-black/70 text-white p-4 rounded-lg z-10 font-headline border border-white/10 shadow-lg">
-        <span className="text-sm text-muted-foreground">Multiplier</span>
+        <div className="text-2xl font-bold">{multiplier.toFixed(2)}x</div>
+        <div className="text-xs text-muted-foreground">Multiplier</div>
       </div>
 
       <RoadAnimation />

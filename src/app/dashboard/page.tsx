@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import ControlPanel from '@/components/game/ControlPanel';
 import GameDisplay from '@/components/game/GameDisplay';
-import { GameState, Difficulty } from '@/lib/definitions';
+import { GameState, Difficulty, difficultySettings } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { useWallet } from '@/context/WalletContext';
 
@@ -48,10 +48,17 @@ export default function GamePage() {
   const handleMove = () => {
     if (gameState.status !== 'playing') return;
 
-    // MOCK a check to see if the monkey is hit
-    const isHit = Math.random() < 0.1; // 10% chance of being hit on any move
+    // Get difficulty settings
+    const { bustChance } = difficultySettings[gameState.difficulty];
+    
+    // Calculate base bust chance (scales with position to make later moves riskier)
+    const positionFactor = (gameState.monkeyPosition + 1) / GRID_COLUMNS;
+    const bustProbability = 0.05 * bustChance * (1 + positionFactor * 2); // 5% base chance, scaled by difficulty and position
 
-    if (isHit) {
+    // Check if the monkey gets busted
+    const isBusted = Math.random() < bustProbability;
+
+    if (isBusted) {
       setGameState((prev) => ({ ...prev, status: 'busted' }));
       toast({
         title: 'Busted!',
@@ -61,11 +68,15 @@ export default function GamePage() {
       return;
     }
 
+    // Calculate new position and multiplier
     const newPosition = gameState.monkeyPosition + 1;
-    const newMultiplier = parseFloat((gameState.currentMultiplier + 0.25).toFixed(2));
+    const difficultyMultiplier = difficultySettings[gameState.difficulty].multiplier;
+    const baseMultiplierIncrement = 0.2 * difficultyMultiplier; // Base increment scaled by difficulty
+    const positionBasedIncrement = (newPosition / GRID_COLUMNS) * 0.3 * difficultyMultiplier; // Increases as you progress
+    const newMultiplier = parseFloat((gameState.currentMultiplier + baseMultiplierIncrement + positionBasedIncrement).toFixed(2));
 
     if (newPosition >= GRID_COLUMNS) {
-      handleCashOut(); // Auto cash-out at the end, using the final multiplier from state
+      handleCashOut(); // Auto cash-out at the end
     } else {
       setGameState((prev) => ({
         ...prev,
