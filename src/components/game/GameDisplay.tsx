@@ -167,6 +167,16 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
     };
   }, [status, columns, createVehicle]);
 
+  // Track which lanes are blocked by the safe barrier
+  const blockedLanes = React.useRef<Set<number>>(new Set());
+  
+  // Reset blocked lanes when game resets
+  React.useEffect(() => {
+    if (status === 'idle') {
+      blockedLanes.current.clear();
+    }
+  }, [status]);
+
   // Collision detection effect
   React.useEffect(() => {
     if (status !== 'playing') return;
@@ -190,19 +200,28 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
         
         // Check if the vehicle is in the same lane as the monkey
         if (monkeyLane === vehicleLane) {
-          // Check vertical overlap (monkey's bottom is below vehicle's top)
-          if (monkeyRect.bottom > vehicleRect.top && monkeyRect.top < vehicleRect.bottom) {
-            // Only trigger collision if the vehicle is close to the monkey's vertical position
+          // Check if vehicle is in the safe zone (just above the monkey)
+          const safeZoneTop = monkeyRect.top - 50; // 50px above monkey
+          const safeZoneBottom = monkeyRect.top + 10; // Just below the monkey's head
+          
+          // If vehicle is in the safe zone and we're in the first 5 jumps
+          if (jumpCount < 5 && vehicleRect.bottom > safeZoneTop && vehicleRect.top < safeZoneBottom) {
+            // Stop the vehicle's animation
+            vehicle.style.animationPlayState = 'paused';
+            // Mark this lane as blocked
+            blockedLanes.current.add(vehicleLane);
+            return;
+          }
+          
+          // Check for collision with monkey (only if not in safe zone)
+          if (vehicleRect.bottom > monkeyRect.top && vehicleRect.top < monkeyRect.bottom) {
             const verticalOverlap = Math.min(monkeyRect.bottom, vehicleRect.bottom) - Math.max(monkeyRect.top, vehicleRect.top);
             
             // Check if the vehicle is coming from above
             const isVehicleAbove = vehicleRect.bottom < (monkeyRect.top + (monkeyRect.height * 0.7));
             
-            // Monkey is protected from above for first 5 jumps
-            const isProtected = jumpCount < 5 && isVehicleAbove;
-            
-            // Only trigger bust if not protected and there's significant overlap
-            if (!isProtected && verticalOverlap > monkeyRect.height * 0.4) {
+            // Only trigger bust if not in first 5 jumps and there's significant overlap
+            if (jumpCount >= 5 && isVehicleAbove && verticalOverlap > monkeyRect.height * 0.4) {
               onBust();
             }
           }
@@ -318,11 +337,14 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
         {/* Protection barrier (only visible and active for first 5 jumps) */}
         {status !== 'busted' && jumpCount < 5 && (
           <div 
-            className="absolute -top-8 left-1/2 -translate-x-1/2 w-16 h-4 bg-yellow-400/50 rounded-full z-40"
+            className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-8 bg-yellow-400/80 rounded-full z-40 flex items-center justify-center border-2 border-yellow-600"
             style={{ 
-              boxShadow: '0 0 15px 5px rgba(255, 255, 0, 0.3)'
+              boxShadow: '0 0 25px 10px rgba(255, 255, 0, 0.6)',
+              transform: 'translateX(-50%) translateY(-10px)'
             }}
-          />
+          >
+            <span className="text-sm font-bold text-yellow-900 drop-shadow-sm">SAFE ZONE</span>
+          </div>
         )}
         <div className="text-6xl drop-shadow-lg relative z-30">
           {status === 'busted' ? '💥' : '🐒'}

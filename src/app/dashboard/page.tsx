@@ -22,6 +22,7 @@ export default function GamePage() {
       betAmount: 1,
       difficulty: 'Easy',
   });
+  const [jumpCount, setJumpCount] = useState(0);
   const { balance, addToBalance, subtractFromBalance } = useWallet();
   const { toast } = useToast();
 
@@ -36,6 +37,7 @@ export default function GamePage() {
     }
 
     subtractFromBalance(gameState.betAmount);
+    setJumpCount(0); // Reset jump count when starting a new game
     setGameState((prev) => ({
       ...prev,
       status: 'playing',
@@ -57,7 +59,8 @@ export default function GamePage() {
   const handleMove = () => {
     if (gameState.status !== 'playing') return;
 
-    // Collision detection is now handled in GameDisplay
+    // Increment jump count
+    setJumpCount(prev => prev + 1);
 
     // Calculate new position and multiplier
     const newPosition = gameState.monkeyPosition + 1;
@@ -89,6 +92,7 @@ export default function GamePage() {
   };
 
   const resetGame = () => {
+    setJumpCount(0);
     setGameState(prevState => ({
       ...INITIAL_STATE,
       // Keep bet amount and difficulty from last round
@@ -114,6 +118,7 @@ export default function GamePage() {
           columns={GRID_COLUMNS}
           multiplier={gameState.currentMultiplier}
           onBust={handleBust}
+          jumpCount={jumpCount}
         />
       </div>
       <div className="lg:col-span-1 pr-4">
