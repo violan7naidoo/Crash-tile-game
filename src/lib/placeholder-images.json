@@ -1,0 +1,10 @@
+{
+  "placeholderImages": [
+    {
+      "id": "savanna-background",
+      "description": "A cartoon drawing of a South African savanna at sunset",
+      "imageUrl": "https://picsum.photos/seed/savanna/1920/1080",
+      "imageHint": "savanna landscape"
+    }
+  ]
+}
