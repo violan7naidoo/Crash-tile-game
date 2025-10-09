@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { Difficulty, GameStatus } from '@/lib/definitions';
 import { difficultySettings } from '@/lib/definitions';
 import { ArrowRight, DollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface ControlPanelProps {
   betAmount: number;
@@ -44,8 +45,22 @@ export default function ControlPanel({
     setBetAmount(value);
   };
 
+  const [isMoveDisabled, setIsMoveDisabled] = useState(false);
   const isPlaying = status === 'playing';
   const potentialWinnings = (betAmount * multiplier).toFixed(2);
+
+  const handleMoveClick = () => {
+    if (!isMoveDisabled) {
+      onMove();
+      setIsMoveDisabled(true);
+      // Enable the button after 0.5s (500ms)
+      const timer = setTimeout(() => {
+        setIsMoveDisabled(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  };
 
   return (
     <Card className="flex flex-col h-full">
@@ -113,7 +128,12 @@ export default function ControlPanel({
               
               <span>R{potentialWinnings}</span>
             </Button>
-            <Button className="bg-green-500 hover:bg-green-600 text-white text-sm" size="sm" onClick={onMove}>
+            <Button 
+              className="bg-green-500 hover:bg-green-600 text-white text-sm" 
+              size="sm" 
+              onClick={handleMoveClick}
+              disabled={isMoveDisabled}
+            >
               Move <ArrowRight className="ml-2 h-1 w-1" />
             </Button>
           </div>
