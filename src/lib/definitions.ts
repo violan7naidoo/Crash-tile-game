@@ -49,11 +49,12 @@ export type GameConfig = {
 
 export type GameStatus = 'idle' | 'playing' | 'busted';
 
-export type GameState = {
+export interface GameState {
   status: GameStatus;
   betAmount: number;
   difficulty: Difficulty;
   monkeyPosition: number;
   currentMultiplier: number;
   gameId: string | null;
+  safeJumps: number;
 };

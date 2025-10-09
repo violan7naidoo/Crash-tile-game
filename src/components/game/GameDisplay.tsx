@@ -10,8 +10,8 @@ interface GameDisplayProps {
   multiplier: number;
   onBust: () => void;
   jumpCount: number;
-  // Add next multiplier to show in the next lane
   nextMultiplier?: number;
+  safeJumps: number;
 }
 
 const vehicleChars = ['🚙', '🚌', '🚚', '🚗', '🚕', '🚓'];
@@ -42,7 +42,7 @@ const RoadAnimation = () => (
   `}</style>
 );
 
-export default function GameDisplay({ status, monkeyPosition, columns, multiplier, onBust, jumpCount, nextMultiplier }: GameDisplayProps) {
+export default function GameDisplay({ status, monkeyPosition, columns, multiplier, onBust, jumpCount, nextMultiplier, safeJumps }: GameDisplayProps) {
   // Calculate monkey position to be centered in the lane
   const monkeyPositionStyle = {
     left: `${((monkeyPosition + 0.5) / columns) * 100}%`,
@@ -206,16 +206,13 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
           const safeZoneTop = monkeyRect.top - 50; // 50px above monkey
           const safeZoneBottom = monkeyRect.top + 10; // Just below the monkey's head
           
-          // Only check for safe zone at the starting position (first lane)
-          if (monkeyPosition === 0) {
-            // If vehicle is in the safe zone at starting position
-            if (vehicleRect.bottom > safeZoneTop && vehicleRect.top < safeZoneBottom) {
-              // Stop the vehicle's animation
-              vehicle.style.animationPlayState = 'paused';
-              // Mark this lane as blocked
-              blockedLanes.current.add(vehicleLane);
-              return;
-            }
+          // Check if vehicle is in the safe zone (just above the monkey)
+          if (jumpCount < safeJumps && vehicleRect.bottom > safeZoneTop && vehicleRect.top < safeZoneBottom) {
+            // Stop the vehicle's animation
+            vehicle.style.animationPlayState = 'paused';
+            // Mark this lane as blocked
+            blockedLanes.current.add(vehicleLane);
+            return;
           }
           
           // Check for collision with monkey
@@ -225,8 +222,8 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
             // Check if the vehicle is coming from above
             const isVehicleAbove = vehicleRect.bottom < (monkeyRect.top + (monkeyRect.height * 0.7));
             
-            // Trigger bust if there's significant overlap and not in the safe starting position
-            if (isVehicleAbove && verticalOverlap > monkeyRect.height * 0.4) {
+            // Only trigger bust if we're past the safe jumps or not in the safe zone
+            if (jumpCount >= safeJumps && isVehicleAbove && verticalOverlap > monkeyRect.height * 0.4) {
               onBust();
             }
           }
@@ -432,8 +429,8 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
         )} 
         style={monkeyPositionStyle}
       >
-        {/* Protection barrier (only visible and active in first lane) */}
-        {status !== 'busted' && monkeyPosition === 0 && (
+        {/* Protection barrier (visible and active for the first safeJumps jumps) */}
+        {status !== 'busted' && jumpCount < safeJumps && (
           <div 
             className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-8 bg-yellow-400/80 rounded-full z-40 flex items-center justify-center border-2 border-yellow-600"
             style={{ 

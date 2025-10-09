@@ -14,6 +14,7 @@ const INITIAL_STATE: Omit<GameState, 'betAmount' | 'difficulty'> = {
   currentMultiplier: 1,
   monkeyPosition: 0,
   gameId: null,
+  safeJumps: 1, // Default value, will be overridden when game starts
 };
 
 const GRID_COLUMNS = 12;
@@ -31,6 +32,7 @@ export default function GamePage() {
     ...INITIAL_STATE,
     betAmount: 1,
     difficulty: 'Easy',
+    safeJumps: 1,
   });
   
   const [jumpCount, setJumpCount] = useState(0);
@@ -58,14 +60,25 @@ export default function GamePage() {
       return;
     }
 
+    // Generate a random number of safe jumps (1 to total columns)
+    const safeJumps = Math.floor(Math.random() * GRID_COLUMNS) + 1;
+    
     subtractFromBalance(gameState.betAmount, 'bet');
     setJumpCount(0);
+    
+    // Show toast with safe jumps info
+    toast({
+      title: `Safe for ${safeJumps} lane${safeJumps > 1 ? 's' : ''}!`,
+      description: `You have ${safeJumps} safe lane${safeJumps > 1 ? 's' : ''} this round.`,
+    });
+    
     setGameState((prev) => ({
       ...prev,
       status: 'playing',
       gameId: `game_${Math.random()}`,
       monkeyPosition: 0,
       currentMultiplier: 1,
+      safeJumps,
     }));
   };
 
@@ -156,22 +169,23 @@ export default function GamePage() {
 
   // Calculate next multiplier to display
   const nextMultiplier = calculateNextMultiplier(
-    gameState.monkeyPosition + 1, 
+    gameState.monkeyPosition + 1,
     gameState.currentMultiplier
   );
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full min-h-[calc(100vh-8rem)]">
       <div className="lg:col-span-4 rounded-lg bg-card border overflow-hidden relative">
-        <GameDisplay
-          status={gameState.status}
-          monkeyPosition={gameState.monkeyPosition}
-          columns={GRID_COLUMNS}
-          multiplier={gameState.currentMultiplier}
-          onBust={handleBust}
-          jumpCount={jumpCount}
-          nextMultiplier={nextMultiplier}
-        />
+          <GameDisplay
+            status={gameState.status}
+            monkeyPosition={gameState.monkeyPosition}
+            columns={GRID_COLUMNS}
+            multiplier={gameState.currentMultiplier}
+            onBust={handleBust}
+            jumpCount={jumpCount}
+            nextMultiplier={nextMultiplier}
+            safeJumps={gameState.safeJumps}
+          />
       </div>
       <div className="lg:col-span-1 pr-4">
         <ControlPanel
