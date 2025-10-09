@@ -286,7 +286,7 @@ export default function GameDisplay({ status, monkeyPosition, columns, multiplie
           </div>
           {isNext && (
             <div className="bg-black/70 text-green-300 font-bold text-xs px-2 py-1 rounded-full">
-              NEXT
+              
             </div>
           )}
         </div>

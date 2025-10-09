@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,16 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useWallet } from '@/context/WalletContext';
 
-const mockTransactions = [
-  { id: '1', type: 'win', amount: 45.50, date: '2023-10-27 10:45 AM' },
-  { id: '2', type: 'bet', amount: -20.00, date: '2023-10-27 10:44 AM' },
-  { id: '3', type: 'deposit', amount: 100.00, date: '2023-10-26 08:00 PM' },
-  { id: '4', type: 'win', amount: 12.30, date: '2023-10-26 03:20 PM' },
-  { id: '5', type: 'bet', amount: -5.00, date: '2023-10-26 03:19 PM' },
-];
-
 export default function WalletPage() {
-  const { balance } = useWallet();
+  const { balance, transactions, addToBalance } = useWallet();
+  const [depositAmount, setDepositAmount] = React.useState(50);
+
+  const handleDeposit = () => {
+    addToBalance(depositAmount, 'deposit');
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -36,8 +34,8 @@ export default function WalletPage() {
             <CardDescription>Add virtual funds to your wallet.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input type="number" placeholder="Enter amount" defaultValue="50" />
-            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">Deposit</Button>
+            <Input type="number" placeholder="Enter amount" value={depositAmount} onChange={(e) => setDepositAmount(parseFloat(e.target.value))} />
+            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" onClick={handleDeposit}>Deposit</Button>
           </CardContent>
         </Card>
       </div>
@@ -57,7 +55,7 @@ export default function WalletPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockTransactions.map((tx) => (
+              {transactions.map((tx) => (
                 <TableRow key={tx.id}>
                   <TableCell>
                     <Badge
@@ -78,7 +76,7 @@ export default function WalletPage() {
                   <TableCell className={`text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {tx.amount > 0 ? `+R${tx.amount.toFixed(2)}` : `-R${Math.abs(tx.amount).toFixed(2)}`}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{tx.date}</TableCell>
+                  <TableCell className="text-muted-foreground">{tx.created_at}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

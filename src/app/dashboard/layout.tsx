@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Home, Wallet, History, Shield, LogOut } from 'lucide-react';
 import { WalletProvider, useWallet } from '@/context/WalletContext';
+import { GameHistoryProvider } from '@/context/GameHistoryContext';
 
 function VervetLogo() {
   return (
@@ -121,7 +122,9 @@ export default function DashboardLayout({
 }) {
   return (
     <WalletProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <GameHistoryProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </GameHistoryProvider>
     </WalletProvider>
   );
 }

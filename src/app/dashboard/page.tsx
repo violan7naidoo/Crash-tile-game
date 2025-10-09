@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ControlPanel from '@/components/game/ControlPanel';
 import GameDisplay from '@/components/game/GameDisplay';
-import { GameState, Difficulty, difficultySettings } from '@/lib/definitions';
+import { GameState, Difficulty, difficultySettings, GameRound } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { useWallet } from '@/context/WalletContext';
+import { useGameHistory } from '@/context/GameHistoryContext';
+import HistoryPage from './history/page';
 
 const INITIAL_STATE: Omit<GameState, 'betAmount' | 'difficulty'> = {
   status: 'idle',
@@ -15,6 +17,14 @@ const INITIAL_STATE: Omit<GameState, 'betAmount' | 'difficulty'> = {
 };
 
 const GRID_COLUMNS = 12;
+
+const mockGameHistory: GameRound[] = [
+    { id: 'g1', user_id: 'u1', bet_amount: 10, difficulty: 'Easy', crash_multiplier: 3.45, cashed_out_at: 2.5, winnings: 25, status: 'won', created_at: '2023-10-27 10:45 AM' },
+    { id: 'g2', user_id: 'u1', bet_amount: 20, difficulty: 'Medium', crash_multiplier: 1.82, cashed_out_at: null, winnings: 0, status: 'busted', created_at: '2023-10-27 10:44 AM' },
+    { id: 'g3', user_id: 'u1', bet_amount: 5, difficulty: 'Hard', crash_multiplier: 15.2, cashed_out_at: 14.1, winnings: 70.5, status: 'won', created_at: '2023-10-26 03:19 PM' },
+    { id: 'g4', user_id: 'u1', bet_amount: 50, difficulty: 'Hardcore', crash_multiplier: 1.01, cashed_out_at: null, winnings: 0, status: 'busted', created_at: '2023-10-26 01:10 PM' },
+    { id: 'g5', user_id: 'u1', bet_amount: 1, difficulty: 'Easy', crash_multiplier: 100, cashed_out_at: 95.5, winnings: 95.5, status: 'snackpot', created_at: '2023-10-25 09:00 AM' },
+];
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState>({
@@ -26,6 +36,7 @@ export default function GamePage() {
   const [jumpCount, setJumpCount] = useState(0);
   const { balance, addToBalance, subtractFromBalance } = useWallet();
   const { toast } = useToast();
+  const { gameHistory, addGameToHistory } = useGameHistory();
 
   // Calculate the next potential multiplier
   const calculateNextMultiplier = (currentPosition: number, currentMultiplier: number): number => {
@@ -47,7 +58,7 @@ export default function GamePage() {
       return;
     }
 
-    subtractFromBalance(gameState.betAmount);
+    subtractFromBalance(gameState.betAmount, 'bet');
     setJumpCount(0);
     setGameState((prev) => ({
       ...prev,
@@ -59,6 +70,18 @@ export default function GamePage() {
   };
 
   const handleBust = () => {
+    const newGame: GameRound = {
+      id: `game_${Date.now()}`,
+      user_id: 'u1', // Replace with actual user ID
+      bet_amount: gameState.betAmount,
+      difficulty: gameState.difficulty,
+      crash_multiplier: gameState.currentMultiplier,
+      cashed_out_at: null,
+      winnings: 0,
+      status: 'busted',
+      created_at: new Date().toLocaleString(),
+    };
+    addGameToHistory(newGame);
     setGameState(prev => ({ ...prev, status: 'busted' }));
     toast({
       title: 'Busted!',
@@ -91,7 +114,20 @@ export default function GamePage() {
   const handleCashOut = () => {
     const finalMultiplier = gameState.currentMultiplier;
     const winnings = gameState.betAmount * finalMultiplier;
-    addToBalance(winnings);
+    addToBalance(winnings, 'win');
+    
+    const newGame: GameRound = {
+      id: `game_${Date.now()}`,
+      user_id: 'u1', // Replace with actual user ID
+      bet_amount: gameState.betAmount,
+      difficulty: gameState.difficulty,
+      crash_multiplier: finalMultiplier,
+      cashed_out_at: finalMultiplier,
+      winnings,
+      status: 'won',
+      created_at: new Date().toLocaleString(),
+    };
+    addGameToHistory(newGame);
     
     toast({
       title: 'Cashed Out!',
@@ -151,6 +187,9 @@ export default function GamePage() {
           balance={balance}
           multiplier={gameState.currentMultiplier}
         />
+      </div>
+       <div className="lg:col-span-5">
+        <HistoryPage />
       </div>
     </div>
   );
